@@ -38,7 +38,7 @@ Do steps 1-3 on a machine connected to the Internet, copy all relevant files to 
 ## Run tool
 5.  In the project directory run the following command in command line: 
   *node spv*.
-6.  Output files can be found in project directory
+6.  Output files can be found in data directory (default - project directory)
 
 # Dependencies
 - nodejs
