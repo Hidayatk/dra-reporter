@@ -1,15 +1,17 @@
 module.exports = Object.freeze({
 	//Configuration
 	draServerIp: "", // DRA Admin server IP - Mandatory
-	draUser: "", //DRA User - Mandatory
-	draPassword: "", //DRA password - Mandatory
 	draAuthString: "", //Base64 encoding of draUser:draPassword - Mandatory
 	
     // Incidents to report
 	reportDbIncidents: true, //Report Database incidents
 	reportFileIncidents: false,//Report File incidents
 
+	//User summary settings
 	reportPerIncidentResponder: true,//Report on each Incidiedent Responder
+	reportPerAppOwner: true,//Report on each Application Owner
+
+	//Accumilative settings
 	lastNDays: 7, //In days. This is used to provide last n days summary
 	saveAccumData: true, //Set to true if you want an accumulative report (as a csv file)
 	accumPeriodInDays: 14, //Accumulative period
@@ -99,20 +101,27 @@ module.exports = Object.freeze({
 			"name": "Slow Rate Personal File Access",
 			"sortOrder": 15
 		},
+		{
+			"apiType": "FAM_DPGA",
+			"name": "Suspicious File Access",
+			"sortOrder": 16
+		},
 	]},
 
 
 	printDebugInfo: false,
 
 //Internal usage	
-	version: "1.0",
+	version: "1.1",
 	useIncidentTimeAsPresent: false, //False - use current time, True - uses most recent incident time as if present time
 	useOldApiVer: false, //When set to true report will behave as if the old API even if new API is available
 	
-	saveResponseResults: false,
-	useResponseFromFile: false,
+	saveResponseResults: false, //Save response from DRA in file
+	useResponseFromFile: false, // Use saved response files as input to tool (using below names)
 	incidentsDataFileName: "incidents_results.txt", //File name used to get and save Incidents data
-	permissionsDataFileName: "permissions_results.txt"	//File name used to get and save Permissions data
+	permissionsFilePostFix: "permissions_results.txt",	//File postfix used to get and save Permissions data
+	incidentResponderFilePrefix: "ir",
+	appOwnerFilePrefix: "ao"
 });
 
 	

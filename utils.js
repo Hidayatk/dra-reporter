@@ -18,11 +18,17 @@ function getFromFile(filename)
 {
   var content;
 
-  console.log(filename)
+//  console.log(filename)
   var content = fs.readFileSync(filename);
 
   return (content)
 }
 
+function fileExists(filename)
+{
+  return (fs.existsSync(filename));
+}
+
 module.exports.saveToFile = saveToFile;
 module.exports.getFromFile = getFromFile;
+module.exports.fileExists = fileExists;

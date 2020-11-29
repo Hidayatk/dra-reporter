@@ -25,6 +25,7 @@ Do steps 1-3 on a machine connected to the Internet, copy all relevant files to 
    - **reportDbIncidents** (default true)- *true* Report Database Incidents
    - **reportFileIncidents** (default false)- *true* Report File incidents
    - **reportPerIncidentResponder** (default true) - *true* - Report on each Incident Responder
+   - **reportPerAppOwner** (default true) - *true* - Report on each Application Owner (from DRA v3.2)
    - **lastNDays** (default 7) - In days. This is used to provide last n days summary
    - **saveAccumData** (default true)- *true* to get accumulative data (in csv file)
    - **accumPeriodInDays** (default 14) - Accumulative period in days

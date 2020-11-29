@@ -4,7 +4,6 @@ var settings = require('./settings.js');
 var utils = require('./utils.js');
 var async = require('async');
 
-
 var timeNow = dateTime.create();
 var dayInMs = 86400000;
 
@@ -18,8 +17,8 @@ if (settings.addTimestamp)
 
 
 /**/ 
-var appVersion = "1.0";
-var requiredSettingsVersion = "1.0";
+var appVersion = "1.1";
+var requiredSettingsVersion = "1.1";
 /**/
 
 
@@ -45,6 +44,40 @@ function run()
 			console.log("Stopped!");
 			process.exit();
 		}
+
+
+		
+		//Check if required files are found
+		if (settings.useResponseFromFile)
+		{
+			console.log("Use Response from file")
+			if (!utils.fileExists(settings.incidentsDataFileName))
+			{
+				console.log(settings.incidentsDataFileName + " file not found");
+				console.log("Stopped!");
+				process.exit();
+			}
+
+			if (settings.reportPerIncidentResponder)
+			{
+				if (!utils.fileExists(settings.incidentResponderFilePrefix + "-" + settings.permissionsFilePostFix))
+				{
+					console.log(settings.incidentResponderFilePrefix + "-" + settings.permissionsFilePostFix + " file not found");
+					console.log("Stopped!");
+					process.exit();
+				}
+			}
+
+			if (settings.reportPerAppOwner)
+			{
+				if (!utils.fileExists(settings.appOwnerFilePrefix + "-" + settings.permissionsFilePostFix))
+				{
+					console.log(settings.appOwnerFilePrefix + "-" + settings.permissionsFilePostFix + " file not found");
+					console.log("Stopped!");
+					process.exit();
+				}
+			}	
+		}
 		if (settings.useIncidentTimeAsPresent)
 			console.log("Use incident time as present")
 		if (settings.useOldApiVer)
@@ -52,8 +85,7 @@ function run()
 	}
 
 
-	if (settings.draServerIp == "" || settings.draUser == "" || 
-		settings.draPassword == ""|| settings.draAuthString == "")
+	if (settings.draServerIp == "" || settings.draAuthString == "")
 	{
 		console.log("Missing credentials");
 		console.log("Stopped!");
@@ -67,12 +99,19 @@ function run()
 		[ 
 		  function(callback) {
 			//Get main account info
-			getIncidentsData(responseData, callback)
+			getIncidentsData(responseData, callback);
 		  },
 		  function(callback) {
 			//Get permissions data
 			if (settings.reportPerIncidentResponder) //This is relevant only if Incident responder is needed;
-				getPermissionData(responseData, callback);
+				getIrPermissionData(responseData, callback);
+			else
+				callback();
+		  },
+		  function(callback) {
+			//Get permissions data
+			if (settings.reportPerAppOwner) //This is relevant only if Incident responder is needed;
+				getAoPermissionData(responseData, callback);
 			else
 				callback();
 		  },
@@ -83,7 +122,7 @@ function run()
 			console.log(err)
 		  }
 		  else
-			  processData(responseData.incidentsData, responseData.permissionsData, responseData.apiVer)
+			  processData(responseData.incidentsData, responseData.permissionsIrData, responseData.permissionsAoData, responseData.apiVer)
 		}
 	  );
 }  	
@@ -116,30 +155,47 @@ function getIncidentDataFromFile(responseData, callback)
 	callback();
 }
 
-function getPermissionData(responseData, callback)
+function getIrPermissionData(responseData, callback)
 {
 	if (!settings.useResponseFromFile)
 	{
-		console.log("Retrieve permissions data from DRA " + settings.draServerIp);
-		getPermissionsDataFromDra(responseData, "1.2", callback);
+		console.log("Retrieve Incident Responders permissions data from DRA " + settings.draServerIp);
+		getIrPermissionDataFromDra(responseData, "1.2", callback);
 	}
 	else
 	{
-		console.log("Get Permissions data from file");
-		permissionsData = getPermissionFromFile(responseData, callback);
+		console.log("Get Incident Responders Permissions data from file");
+		permissionsData = getPermissionFromFile(settings.incidentResponderFilePrefix, responseData, callback);
 	}
 }
 
-function getPermissionFromFile(responseData, callback)
+function getAoPermissionData(responseData, callback)
 {
-	var response = utils.getFromFile(settings.permissionsDataFileName);
+	if (!settings.useResponseFromFile)
+	{
+		console.log("Retrieve App Owners permissions data from DRA " + settings.draServerIp);
+		getAoPermissionDataFromDra(responseData, "1.2", callback);
+	}
+	else
+	{
+		console.log("Get App Owners Permissions data from file");
+		permissionsData = getPermissionFromFile(settings.appOwnerFilePrefix, responseData, callback);
+	}
+}
+
+function getPermissionFromFile(preFix, responseData, callback)
+{
+	var response = utils.getFromFile(preFix + "-" + settings.permissionsFilePostFix);
 	var jResponse = JSON.parse(response);
 
-	responseData.permissionsData = jResponse;
+	if (preFix == settings.incidentResponderFilePrefix)
+		responseData.permissionsIrData = jResponse;
+	else if (preFix == settings.appOwnerFilePrefix)
+		responseData.permissionsAoData = jResponse;
 	callback();
 }
 
-function processData(incidentsData, permissionsData, apiVer)
+function processData(incidentsData, permissionsIrData, permissionsAoData, apiVer)
 {
 	var respondersList = [];
 
@@ -148,12 +204,29 @@ function processData(incidentsData, permissionsData, apiVer)
 
 	if (settings.reportPerIncidentResponder)
 	{
-		for (var i=0; i<permissionsData.permissions.length; i++)
+		if (permissionsIrData)
 		{
-			if (permissionsData.permissions[i].allowed_destination_ips.length > 0)
+			for (var i=0; i<permissionsIrData.permissions.length; i++)
 			{
-				respondersList.push({"type": "responder", "name": permissionsData.permissions[i].username, "ipList": permissionsData.permissions[i].allowed_destination_ips});
+				if (permissionsIrData.permissions[i].allowed_destination_ips.length > 0)
+				{
+					respondersList.push({"type": "responder", "name": permissionsIrData.permissions[i].username, "ipList": permissionsIrData.permissions[i].allowed_destination_ips});
+				}
 			}
+		}
+	}
+
+	if (settings.reportPerAppOwner)
+	{
+		if (permissionsAoData)
+		{
+			for (var i=0; i<permissionsAoData.permissions.length; i++)
+			{
+				if (permissionsAoData.permissions[i].allowed_destination_ips.length > 0)
+				{
+					respondersList.push({"type": "responder", "name": permissionsAoData.permissions[i].username, "ipList": permissionsAoData.permissions[i].allowed_destination_ips});
+				}
+			}		
 		}
 	}
 
@@ -183,7 +256,6 @@ function getIncidentDataFromDra(responseData, apiVer, callback)
 {
 	var basicAuthStr = "Basic " + settings.draAuthString;
 	var urlString = "https://" + settings.draServerIp + ":8443/counterbreach/api/" + apiVer +"/security_events?event_category=incident&status=all";
-
 	// form data
 	var options = {
 		method: 'GET',
@@ -198,13 +270,10 @@ function getIncidentDataFromDra(responseData, apiVer, callback)
 		headers: {
 			'Content-Type': 'application/json',
 			'Authorization': basicAuthStr 
-		},
-		auth: {
-			'user': settings.draUser,
-			'pass': settings.draPassword,
-			'sendImmediately': false,	  
 			},
 		}
+	if (settings.printDebugInfo)
+		console.log(urlString);
 	request(options)
 	.then(function (response) {	
 		 var errMessage = response.body;
@@ -242,11 +311,10 @@ function getIncidentDataFromDra(responseData, apiVer, callback)
 	})
 }
 
-function getPermissionsDataFromDra(responseData, apiVer, callback)
+function getIrPermissionDataFromDra(responseData, apiVer, callback)
 {
 	var basicAuthStr = "Basic " + settings.draAuthString;
 	var urlString = "https://"  + settings.draServerIp + ":8443/counterbreach/api/1.2/users/permissions"
-
 	// form data
 	var options = {
 		method: 'GET',
@@ -261,13 +329,11 @@ function getPermissionsDataFromDra(responseData, apiVer, callback)
 		headers: {
 			'Content-Type': 'application/json',
 			'Authorization': basicAuthStr 
-		},
-		auth: {
-			'user': settings.draUser,
-			'pass': settings.draPassword,
-			'sendImmediately': false,	  
 			},
 		}
+	if (settings.printDebugInfo)
+		console.log(urlString);
+		
 	request(options)
 	.then(function (response) {	
 		//console.log(response.body);
@@ -277,25 +343,25 @@ function getPermissionsDataFromDra(responseData, apiVer, callback)
 				var jResponse = JSON.parse(response.body);
 				if (settings.saveResponseResults) //Used for debug
 				{
-					console.log("Saving permissions response to file")
-					utils.saveToFile(settings.permissionsDataFileName, response.body);
+					console.log("Saving Incident responders permissions response to file")
+					utils.saveToFile(settings.incidentResponderFilePrefix + "-" + settings.permissionsFilePostFix, response.body);
 				}
 				if (settings.useOldApiVer)
 					apiVer = "1.0"
-				responseData.permissionsData = jResponse;
+				responseData.permissionsIrData = jResponse;
 				callback();
 			}
 			else if (response.statusCode == 404)
 			{
 				if (settings.printDebugInfo)
-					console.log("getPermissionsDataFromDra - Previous API version")
+					console.log("getIrPermissionDataFromDra - Previous API version")
 
-				getPermissionsDataFromDra(responseData, "1.0", callback)
+				getIrPermissionDataFromDra(responseData, "1.0", callback)
 			}
 			else
 			{
-				console.log("getPermissionsDataFromDra failed")
-				callback("Failed getPermissionsDataFromDra " + response);
+				console.log("getIrPermissionDataFromDra failed")
+				callback("Failed getIrPermissionDataFromDra " + response);
 			 }
 		})
 		.catch(function (err) {
@@ -305,6 +371,61 @@ function getPermissionsDataFromDra(responseData, apiVer, callback)
 		})
 }	
 
+
+function getAoPermissionDataFromDra(responseData, apiVer, callback)
+{
+	var basicAuthStr = "Basic " + settings.draAuthString;
+	var urlString = "https://"  + settings.draServerIp + ":8443/counterbreach/api/1.2/users/permissions/appowners"
+	// form data
+	var options = {
+		method: 'GET',
+		rejectUnauthorized: false,
+		requestCert: true,
+		
+		agent: false,
+		port: 8443,
+		uri: urlString,
+		resolveWithFullResponse: true, //Set to get HTTP error code
+		simple: false,				   //Set to hand HTTP error code
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': basicAuthStr 
+			},
+		}
+	if (settings.printDebugInfo)
+		console.log(urlString);
+	request(options)
+	.then(function (response) {	
+		//console.log(response.body);
+			var errMessage = response.body;
+			if (response.statusCode == 200)
+			{
+				var jResponse = JSON.parse(response.body);
+				if (settings.saveResponseResults) //Used for debug
+				{
+					console.log("Saving App Owners permissions response to file")
+					utils.saveToFile(settings.appOwnerFilePrefix + "-" + settings.permissionsFilePostFix, response.body);
+				}
+				responseData.permissionsAoData = jResponse;
+				callback();
+			}
+			else if (response.statusCode == 404)
+			{
+				console.log("Application Owners not supported in current DRA version")
+				callback();
+			}
+			else
+			{
+				console.log("getAoPermissionDataFromDra failed")
+				callback("Failed getAoPermissionDataFromDra " + response);
+			 }
+		})/*
+		.catch(function (err) {
+			// Deal with the error
+			console.log("getAoPermissionDataFromDra failed")
+			callback("Failed getAoPermissionDataFromDra " + err);
+		})*/
+}
 
 
 
@@ -323,14 +444,17 @@ function buildDraReport(type, name, ipAddresses, draInfo, apiVer)
 	if (settings.printDebugInfo)
 		console.log(draInfo.data.incidentSpecificStats);
 
-	/*Sort by incident name as appears in DRA help */
-	draInfo.data.incidentSpecificStats.sort(function (a,b) {
-		if (a.sortOrder <= b.sortOrder)
-			return (-1);
-		else
-			return (1);
-		});
-
+	//Do this only if there are incidents
+	if (draInfo.data.incidentSpecificStats)
+	{
+		/*Sort by incident name as appears in DRA help */
+		draInfo.data.incidentSpecificStats.sort(function (a,b) {
+			if (a.sortOrder <= b.sortOrder)
+				return (-1);
+			else
+				return (1);
+			});
+	}
 	output = '<html> <script src="https://code.jquery.com/jquery-3.1.0.js"></script>\n';
 	output += '<head> <style> tr:nth-child(even) {background: #CCC}</style> </head>\n';
 	output += '<title> Imperva Data Risk Analytics Report</title>\n'
@@ -375,6 +499,11 @@ function buildDraReport(type, name, ipAddresses, draInfo, apiVer)
 
 function buildOverAllStats(draInfo, apiVer)
 {
+	//If there are no incidents get out
+	if (!draInfo.data.incidentSpecificStats)
+	{
+		return ("No Incidents");
+	}
 	var displayClosed = false;
 	if (apiVer == "1.2")
 		displayClosed = true;
@@ -427,6 +556,11 @@ function buildOverAllStats(draInfo, apiVer)
 
 function buildLastNDaysStats(draInfo)
 {
+	if (!draInfo.data.incidentSpecificStats)
+	{
+		return ("No Incidents");
+	}
+
 	var output = '<table>\n';
 
 	output += '<tr><th align="left">Incident name</th><th align="left" colspan="5">Opened</th></tr>\n';
@@ -529,6 +663,9 @@ function createAccumCsv(name, accumData, apiVer)
 	var openMediumStatusRow = 'Open Medium';
 	var openLowStatusRow = 'Open Low';
 
+	if (!accumData)
+		return;
+
 	/* Columns grow for each period of time*/
 	for (var i=0; i<accumData.length; i++)
 	{
@@ -565,6 +702,9 @@ function createAccumCsv(name, accumData, apiVer)
 
 function createCsv(name, draInfo, apiVer, lastDayCaption)
 {
+	if (!draInfo.data.incidentSpecificStats)
+		return;
+
 	var csvFileOutput = 'Incident, Open Critical, Open High, Open Medium, Open Low';
 
 	if (apiVer == "1.2")
@@ -630,6 +770,13 @@ function setDraStats(type, ipAddresses, response, draInfoOutput)
 	var accumPeriodStats;
 	var accumData = [];
 	var useIncidentInfo = true;
+
+	//If there are no incidents
+	if (response.events.length <= 0)
+	{
+		console.log("No Incidents");
+		return;
+	}
 
 	var incidentSpecificStats = createIncidentsSpecificStatsArr();
 
