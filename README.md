@@ -19,8 +19,6 @@ Do steps 1-3 on a machine connected to the Internet, copy all relevant files to 
 ## Configuration
 4. In setting.js set the following:
    - **draServerIp** (**mandatory**)- DRA Admin server IP
-   - **draUser** (**mandatory**)- DRA User as described in the [DRA Authorization](https://docs.imperva.com/bundle/v3.1-data-risk-analytics-user-guide/page/62776.htm) page
-   - **draPassword** (mandatory) - DRA password as described in the [DRA Authorization](https://docs.imperva.com/bundle/v3.1-data-risk-analytics-user-guide/page/62776.htm) page
    - **draAuthString** (mandatory)- Base64 encoding of draUser:draPassword as described in the [DRA Authorization](https://docs.imperva.com/bundle/v3.1-data-risk-analytics-user-guide/page/62776.htm) page
    - **reportDbIncidents** (default true)- *true* Report Database Incidents
    - **reportFileIncidents** (default false)- *true* Report File incidents
